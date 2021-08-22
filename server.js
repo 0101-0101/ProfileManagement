@@ -17,6 +17,6 @@ const userRouter = require('./routes/user.route')
 app.use('/',userRouter)
 
 
-app.listen(3000, function() {
+app.listen(process.env.PORT, function() {
     console.log('listening on 3000')
   })
