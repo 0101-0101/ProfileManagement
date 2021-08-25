@@ -1,7 +1,7 @@
 const express = require('express')
 const router = express.Router()
 
-const { registerController, signinController, userPost, activationController } = require('../controllers/auth.controller')
+const { registerController, signinController, userPost, activationController, redisTest } = require('../controllers/auth.controller')
 
 const { validSign, validLogin } = require('../helpers/valid')
 
@@ -10,6 +10,8 @@ router.post('/register', validSign, registerController)
 router.get('/activation/:token', activationController)
 
 router.post('/login', validLogin, signinController)
+
+router.get('/post/:value', redisTest)
 
 const multer = require('multer')
 
