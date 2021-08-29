@@ -11,13 +11,16 @@ const corsOptions = {
 }
 app.use(cors(corsOptions))
 
-const { connectDB } = require('./database.js')
-connectDB()
+// const { connectDB, getDB } = require('./db/database.js')
+// connectDB()
+// setRoutes(app, getDB())
 
 const userRouter = require('./routes/user.route')
 
 app.use('/', userRouter)
 
-app.listen(process.env.PORT, function () {
-  console.log('listening on 3000')
-})
+// app.listen(process.env.PORT, function () {
+//   console.log('listening on 3000')
+// })
+
+module.exports = app

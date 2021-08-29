@@ -1,10 +1,10 @@
-/* eslint-disable prefer-promise-reject-errors */
 const { validationResult } = require('express-validator')
 const crypto = require('crypto')
 const jwt = require('jsonwebtoken')
 const axios = require('axios')
 
-const { getDB } = require('../database.js')
+// const { getDB } = require('../db/database.js')
+const connect = require('../db/database')
 
 const nodemailer = require('nodemailer')
 
@@ -12,11 +12,14 @@ const speakeasy = require('speakeasy')
 const secret = speakeasy.generateSecret({ length: 20 })
 
 const redis = require('redis')
-const client = redis.createClient()
+
 // const { promisify } = require('util')
 
 exports.registerController = async (req, res) => {
-  const db = getDB()
+  // const db = getDB()
+  const { db } = await connect()
+  const client = redis.createClient()
+
   const { name, email, password } = req.body
   const errors = validationResult(req)
 
@@ -30,6 +33,8 @@ exports.registerController = async (req, res) => {
     })
   } else {
     const user = await db.collection('User').findOne({ email })
+    // const user = await db.collection('User').findOne({ email })
+
     // console.log(user)
     if (user) {
       return res.status(400).json({
@@ -107,8 +112,11 @@ exports.registerController = async (req, res) => {
 }
 
 exports.activationController = async (req, res) => {
+  const client = redis.createClient()
   console.log('Keys', client.keys('*'))
-  const db = getDB()
+  // const db = getDB()
+  const { db } = await connect()
+
   const token = req.params.token
   const tokenValidates = speakeasy.totp.verify({
     secret: secret.base32,
@@ -119,26 +127,33 @@ exports.activationController = async (req, res) => {
   })
   console.log(token, tokenValidates)
 
-  client.keys('*', (error, items) => {
-    if (error) {
-      console.error(error)
-    } else {
-      console.log(items)
-      items.map(val =>
-        // console.log(val)
-        client.HGETALL(val, (err, value) => {
-          if (err) console.errors(err)
-          if (Number(value.token) === token) {
-            // console.log(value)
-            return client.hmset(val, { verify: 'true' }, redis.print)
-          }
+  const verifyUser = () => {
+    return new Promise((resolve, reject) => {
+      client.keys('*', (error, items) => {
+        if (error) {
+          return reject(new Error('Error Occured while Fectching Keys'))
         }
-        ))
-    }
-  })
+        console.log(items)
+        items.map(val =>
+        // console.log(val)
+          client.HGETALL(val, (err, value) => {
+            if (err) console.errors(err)
+            if (Number(value.token) === token) {
+              // console.log(value)
+              client.hmset(val, { verify: 'true' }, redis.print)
+              return resolve()
+            }
+          }
+          ))
+      })
+    })
+  }
 
   if (tokenValidates) {
     db.collection('User').updateOne({ token }, { $set: { token: '', Verify: true } })
+
+    await verifyUser()
+
     return res.json({
       message: 'User Update Sucess'
     })
@@ -196,15 +211,13 @@ exports.activationController = async (req, res) => {
 
 exports.signinController = async (req, res) => {
   const { email, password } = req.body
+  const client = redis.createClient()
 
   const matchUser = () => {
     return new Promise((resolve, reject) => {
       client.keys('*', (err, items) => {
         if (err) {
-          return reject({
-            errors: true,
-            message: err
-          })
+          return reject(new Error('Error Occured while Fectching Keys'))
         }
         // console.log(items)
         items.map(val =>
@@ -224,9 +237,7 @@ exports.signinController = async (req, res) => {
     return new Promise((resolve, reject) => {
       client.HGETALL(val, (_, value) => {
         if (!val) {
-          return reject({
-            errors: 'User with that email does not exist. Please signup'
-          })
+          return reject(new Error('User with that email does not exist. Please signup'))
         }
         return resolve({ value })
       })
@@ -326,7 +337,9 @@ exports.signinController = async (req, res) => {
 }
 
 exports.userPost = async (req, res) => {
-  const db = getDB()
+  // const db = getDB()
+  const { db } = await connect()
+
   console.log(req.body) // form fields
   console.log(req.file.path)
   const requestBody = {
@@ -346,6 +359,7 @@ exports.userPost = async (req, res) => {
 }
 
 exports.redisTest = (req, res) => {
+  const client = redis.createClient()
   try {
     const Item = req.params.value
 
